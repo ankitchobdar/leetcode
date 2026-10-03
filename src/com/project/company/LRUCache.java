@@ -2,58 +2,81 @@ package com.project.company;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class LRUCache {
-    private Map<String, Node> cache = new HashMap<>();
-    private Node head;
-    private Node tail;
-    private int capacity;
+    private final Map<String, Node> cache = new HashMap<>();
+    private final Node head = new Node();
+    private final Node tail = new Node();
+    private final int capacity;
+    private final ReentrantLock lock = new ReentrantLock();
 
     public LRUCache(int capacity) {
+        if (capacity <= 0) throw new IllegalArgumentException("capacity must be > 0");
         this.capacity = capacity;
-        head = new Node();
-        tail = new Node();
         head.next = tail;
         tail.prev = head;
     }
 
     static class Node {
-        Node prev;
-        Node next;
-        String key;
-        String value;
-
-        public Node() {}
-        public Node(String key, String value) {
-            this.key = key;
-            this.value = value;
-        }
+        Node prev, next;
+        String key, value;
+        Node() {}
+        Node(String key, String value) { this.key = key; this.value = value; }
     }
 
     public String get(String key) {
-        Node node = cache.get(key);
-        if (node == null) {
-            return null;
+        lock.lock();
+        try {
+            Node node = cache.get(key);
+            if (node == null) return null;
+            remove(node);
+            addToHead(node);
+            return node.value;
+        } finally {
+            lock.unlock();
         }
-        remove(node);
-        addToHead(node);
-        return node.value;
     }
 
     public void put(String key, String value) {
-        Node node = cache.get(key);
-        if (node == null) {
+        lock.lock();
+        try {
+            Node node = cache.get(key);
+            if (node != null) {
+                node.value = value;
+                remove(node);
+                addToHead(node);
+                return;
+            }
+            if (cache.size() == capacity) {
+                Node lru = tail.prev;
+                remove(lru);
+                cache.remove(lru.key);      // the missing step
+            }
             Node newNode = new Node(key, value);
             cache.put(key, newNode);
-            if(cache.size() > capacity){
-                remove(tail.prev);
-            }
             addToHead(newNode);
-        } else {
-            node.value = value;
-            remove(node);
-            addToHead(node);
+        } finally {
+            lock.unlock();
         }
+    }
+
+    public String snapshot() {
+        lock.lock();
+        try {
+            StringBuilder sb = new StringBuilder("[");
+            for (Node n = head.next; n != tail; n = n.next) {
+                sb.append(n.key).append(':').append(n.value);
+                if (n.next != tail) sb.append(", ");
+            }
+            return sb.append(']').toString();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void traverse() {
+        System.out.println(snapshot());   // print outside the lock
     }
 
     private void remove(Node node) {
@@ -63,20 +86,9 @@ public class LRUCache {
 
     private void addToHead(Node node) {
         node.next = head.next;
+        node.prev = head;
         head.next.prev = node;
         head.next = node;
-        node.prev = head;
-    }
-
-    public void traverse() {
-        Node node = head.next;
-        System.out.print("[");
-        while (node.next != null) {
-            System.out.print(node.key+":"+node.value+", ");
-            node = node.next;
-        }
-        System.out.print("]");
-        System.out.println();
     }
 }
 class TestLRUCache {
