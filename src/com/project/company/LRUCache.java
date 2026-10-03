@@ -2,10 +2,11 @@ package com.project.company;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class LRUCache {
-    private final Map<String, Node> cache = new HashMap<>();
+    private final Map<String, Node> cache = new ConcurrentHashMap<>();
     private final Node head = new Node();
     private final Node tail = new Node();
     private final int capacity;
@@ -20,7 +21,8 @@ public class LRUCache {
 
     static class Node {
         Node prev, next;
-        String key, value;
+        String key;
+        volatile String value;
         Node() {}
         Node(String key, String value) { this.key = key; this.value = value; }
     }
